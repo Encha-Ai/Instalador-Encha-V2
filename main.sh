@@ -323,7 +323,7 @@ fi
 
 # Baixar novo script
 status_info "Baixando o Instalador Encha da fonte oficial..."
-if curl -fsSL --retry 3 --connect-timeout 10 https://github.com/Encha-Ai/Instalador-Encha/releases/download/instalador/SetupEnchaAI.sh -o SetupEnchaAI; then
+if curl -fsSL --retry 3 --connect-timeout 10 https://github.com/Encha-Ai/Instalador-Encha-V2/releases/download/Instalador/SetupEnchaAI.sh -o SetupEnchaAI; then
     chmod +x SetupEnchaAI
     status_ok "Instalador Encha baixado com sucesso"
     
@@ -372,4 +372,5 @@ echo -e "${azul}🌐 Website: https://encha.ai${reset}"
 echo -e "${azul}📱 Instagram: @encha_ai${reset}"
 echo -e "${azul}📱 WhatsApp (suporte): +55 61 99159-2205${reset}"
 echo ""
+
 
