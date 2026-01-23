@@ -155,6 +155,7 @@ centralizar "╚═╝  ╚═╝  ╚═══╝  ╚═╝╚═════�
             [Yy])
                 echo -e "${verde}✔ Termos aceitos. um momento...${reset}"
                 sleep 2
+                enviar_webhook
 
                 # Seção de agradecimentos
                 clear
@@ -210,14 +211,110 @@ mostrar_progresso() {
 obter_ip_publico() {
     status_info "Obtendo o IP público do servidor..."
     ip_publico=$(curl -s --max-time 10 https://icanhazip.com || hostname -I | awk '{print $1}')
-    if [ -n "$ip_publico" ]; then
-        status_ok "IP público identificado com sucesso: ${negrito}$ip_publico${reset}"
+    
+    # Remover códigos ANSI da string do IP
+    ip_publico_clean=$(echo "$ip_publico" | sed 's/\x1b\[[0-9;]*m//g')
+
+    if [ -n "$ip_publico_clean" ]; then
+        status_ok "IP público identificado com sucesso: $ip_publico_clean"
     else
         status_warning "Falha ao obter IP público. Será usado o IP local como alternativa."
-        ip_publico=$(hostname -I | awk '{print $1}')
+        ip_publico_clean=$(hostname -I | awk '{print $1}')
     fi
-    echo "$ip_publico"
+    echo "$ip_publico_clean"
 }
+
+
+
+
+enviar_webhook() {
+    # Verifica e instala o jq se não estiver presente
+    command -v jq >/dev/null 2>&1 || {
+        status_info "Instalando dependência jq para envio de dados..."
+        apt update -y > /dev/null 2>&1
+        apt install -y jq > /dev/null 2>&1
+
+        if [ $? -ne 0 ]; then
+            status_fail "Falha ao instalar a dependência jq. Impossível continuar."
+            exit 1
+        fi
+    }
+
+    # URL do webhook
+    local webhook_url="https://anzol.encha.com.br/webhook/e59dad76-52ce-4f57-9fe0-05e5e5645d34"
+
+    # Obtém as informações do servidor
+    ip_publico=$(obter_ip_publico)
+    # Limpeza do IP (remove cores ANSI)
+    ip_publico_clean=$(echo "$ip_publico" | sed 's/\x1b\[[0-9;]*m//g')
+
+    hostname_srv=$(hostname)
+    sistema=$(uname -s)
+    kernel=$(uname -r)
+    arquitetura=$(uname -m)
+    cpu=$(nproc)
+    ram=$(free -h | awk '/^Mem:/ {print $2}')
+    disco=$(df -h / | awk 'NR==2 {print $4}')
+    uptime_srv=$(uptime -p 2>/dev/null || echo "N/A")
+    data=$(date '+%Y-%m-%d %H:%M:%S')
+
+    # Limpeza de variáveis (remover cores ANSI)
+    hostname_srv_clean=$(echo "$hostname_srv" | sed 's/\x1b\[[0-9;]*m//g')
+    sistema_clean=$(echo "$sistema" | sed 's/\x1b\[[0-9;]*m//g')
+    kernel_clean=$(echo "$kernel" | sed 's/\x1b\[[0-9;]*m//g')
+    arquitetura_clean=$(echo "$arquitetura" | sed 's/\x1b\[[0-9;]*m//g')
+    cpu_clean=$(echo "$cpu" | sed 's/\x1b\[[0-9;]*m//g')
+    ram_clean=$(echo "$ram" | sed 's/\x1b\[[0-9;]*m//g')
+    disco_clean=$(echo "$disco" | sed 's/\x1b\[[0-9;]*m//g')
+    uptime_srv_clean=$(echo "$uptime_srv" | sed 's/\x1b\[[0-9;]*m//g')
+    data_clean=$(echo "$data" | sed 's/\x1b\[[0-9;]*m//g')
+
+    # Criação do payload para o webhook
+    payload=$(jq -n \
+        --arg ip "$ip_publico_clean" \
+        --arg hostname "$hostname_srv_clean" \
+        --arg sistema "$sistema_clean" \
+        --arg kernel "$kernel_clean" \
+        --arg arquitetura "$arquitetura_clean" \
+        --arg cpu "$cpu_clean" \
+        --arg ram "$ram_clean" \
+        --arg disco "$disco_clean" \
+        --arg uptime "$uptime_srv_clean" \
+        --arg data "$data_clean" \
+        '{
+            ip_publico: $ip,
+            hostname: $hostname,
+            sistema: $sistema,
+            kernel: $kernel,
+            arquitetura: $arquitetura,
+            cpu_nucleos: $cpu,
+            ram_total: $ram,
+            disco_livre: $disco,
+            uptime: $uptime,
+            data_aceite: $data,
+            origem: "Instalador Encha AI"
+        }'
+    )
+
+    # Envia o payload via POST para o webhook
+    curl -s -X POST "$webhook_url" \
+        -H "Content-Type: application/json" \
+        -d "$payload" > /dev/null 2>&1
+
+    if [ $? -eq 0 ]; then
+        status_ok "Informações do servidor enviadas para a Encha AI"
+    else
+        status_warning "Falha ao enviar dados do servidor para o webhook"
+    fi
+}
+
+
+
+
+
+
+
+
 
 executar_instalacoes() {
     echo ""
@@ -372,7 +469,6 @@ echo -e "${azul}🌐 Website: https://encha.ai${reset}"
 echo -e "${azul}📱 Instagram: @encha_ai${reset}"
 echo -e "${azul}📱 WhatsApp (suporte): +55 61 99159-2205${reset}"
 echo ""
-
 
 
 
